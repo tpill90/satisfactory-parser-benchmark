@@ -26,10 +26,12 @@ import zlib
 import glob
 import enum
 
-PROGRESS_BAR_ENABLE_DECOMPRESS = True
-PROGRESS_BAR_ENABLE_PARSE = True
+PROGRESS_BAR_ENABLE_DECOMPRESS = False
+PROGRESS_BAR_ENABLE_PARSE = False
 PROGRESS_BAR_ENABLE_DUMP = True
 PRINT_DEBUG = False
+
+# region Path definitions
 
 class Purity(enum.Enum):
    UNKNOWN = 0
@@ -2330,6 +2332,8 @@ MILESTONE_COSTS = {
    },
 }
 
+# endregion
+
 satisfactoryCalculatorInteractiveMapExtras = []
 
 class ParseError(Exception):
@@ -2409,25 +2413,6 @@ def parseData(offset, data, length):
    if offset + length > len(data):
       raise ParseError(f"Offset {offset} too large for data of length {length} in {len(data)}-byte data.")
    return (offset + length, data[offset:offset+length])
-
-def TESTING_ONLY_dumpSection(offset, data, sectionStart, sectionSize, name = ""):
-   if offset > sectionStart + sectionSize:
-      print(f"ERROR: TESTING_ONLY_dumpSection called already passed end offset")
-      return offset
-   print(f"DUMP SECTION from {offset} to {sectionStart + sectionSize}")
-   numInts = int((sectionStart + sectionSize - offset) / 4)
-   for idx in range(numInts):
-      (offset, uint32) = parseUint32(offset, data)
-      print(f"DUMP SECTION {name} uint32[{idx}]={hex(uint32)}")
-   idx = 0
-   while sectionStart + sectionSize - offset > 0:
-      (offset, int8) = parseInt8(offset, data)
-      print(f"DUMP SECTION {name} int8[{idx}]={int8}")
-      idx += 1
-   return offset
-
-def TESTING_ONLY_dumpData(offset, data, length, name = ""):
-   return TESTING_ONLY_dumpSection(offset, data, offset, length, name)
 
 def confirmBasicType(originalOffset, data, parser, expectedValue, message = None):
    (newOffset, value) = parser(originalOffset, data)
@@ -2531,29 +2516,6 @@ class ComponentHeader:
 
    def __str__(self):
       return f"<ComponentHeader: className={self.className}, rootObject={self.rootObject}, instanceName={self.instanceName}, parentActorName={self.parentActorName}>"
-
-def toString(value):
-   if isinstance(value, str):
-      return f"'{value}'"
-   elif isinstance(value, (tuple, list)):
-      string = ""
-      for element in value:
-         if len(string) > 0:
-            string += ", "
-         string += toString(element)
-      if isinstance(value, tuple):
-         return f"({string})"
-      else:
-         return f"[{string}]"
-   elif isinstance(value, dict):
-      string = ""
-      for key in value:
-         if len(string) > 0:
-            string += ", "
-         string += f"{toString(key)}: {toString(value[key])}"
-      return "{" + string + "}"
-   else: # if isinstance(value, (int, float, bool, complex)):
-      return str(value)
 
 def getPropertyValue(properties, needlePropertyName):
    for (haystackPropertyName, propertyValue) in properties:
@@ -3503,28 +3465,6 @@ def decompressSaveFile(offset, data):
       progressBar.complete()
    return decompressedData
 
-def pathNameToReadableName(name):
-   if len(name) == 0:
-      return name
-   originalName = name
-   pos = name.rfind(".")
-   if pos != -1:
-      name = name[pos+1:]
-   if name in READABLE_PATH_NAME_CORRECTIONS:
-      return READABLE_PATH_NAME_CORRECTIONS[name]
-   pos = name.find("_", pos)
-   if pos != -1:
-      name = name[pos+1:]
-   if name.endswith("_C"):
-      name = name[:-2]
-   name = name.replace("_", ", ")
-   for letter in ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"):
-      name = name.replace(letter, f" {letter}")
-   name = name.replace("  ", " ")
-   if name[0] == " ":
-      name = name[1:]
-   return f"{name} ({originalName})"
-
 def readFullSaveFile(filename, decompressedOutputFilename = None):
    global satisfactoryCalculatorInteractiveMapExtras
    satisfactoryCalculatorInteractiveMapExtras = []
@@ -3634,179 +3574,3 @@ def readSaveFileInfo(filename):
    saveFileInfo = SaveFileInfo()
    offset = saveFileInfo.parse(data)
    return saveFileInfo
-
-if __name__ == '__main__':
-
-   if (len(sys.argv) <= 1 or len(sys.argv[1]) == 0) and os.path.isdir(".config/Epic/FactoryGame/Saved/SaveGames/server"):
-      allSaveFiles = glob.glob(".config/Epic/FactoryGame/Saved/SaveGames/server/*.sav")
-      savFilename = max(allSaveFiles, key=os.path.getmtime)
-   elif (len(sys.argv) <= 1 or len(sys.argv[1]) == 0) and "LOCALAPPDATA" in os.environ and os.path.isdir(f"{os.environ['LOCALAPPDATA']}\\FactoryGame\\Saved\\SaveGames"):
-      allSaveFiles = glob.glob(f"{os.environ['LOCALAPPDATA']}\\FactoryGame\\Saved\\SaveGames\\*\\*.sav")
-      savFilename = max(allSaveFiles, key=os.path.getmtime)
-   elif len(sys.argv) <= 1:
-      print("ERROR: Please supply save file path/name to perform parsing.", file=sys.stderr)
-      exit(1)
-   else:
-      savFilename = sys.argv[1]
-
-   if len(sys.argv) >= 3:
-      outBase = sys.argv[2]
-   elif len(savFilename) >= 5:
-      outBase = savFilename[:-4]
-   else:
-      outBase = savFilename
-   dumpOutputFilename = outBase + "-dump.txt"
-   slugOutputFilename = outBase + "-slugs.txt"
-   somersloopOutputFilename = outBase + "-somersloop.txt"
-   mercerSphereOutputFilename = outBase + "-mercerSphere.txt"
-   decompressedOutputFilename = outBase + "-decompressed.txt"
-   droppedItemsOutputFilename = outBase + "-dropped.txt"
-
-   if not os.path.isfile(savFilename):
-      print(f"ERROR: Save file does not exist: '{savFilename}'", file=sys.stderr)
-      exit(1)
-
-   print(f"Parsing {savFilename}")
-   with open(dumpOutputFilename, "w", encoding="utf-8") as dumpOut:
-
-      dumpOut.write("=== Header Only ===\n")
-      try:
-         saveFileInfo = readSaveFileInfo(savFilename)
-         dumpOut.write(f"Parsed Session Name: {saveFileInfo.sessionName}\n")
-         dumpOut.write(f"Parsed Play Time: {round(saveFileInfo.playDurationInSeconds/60,1)} minutes\n")
-         dumpOut.write(f"Parsed Save Date: {saveFileInfo.saveDatetime.strftime('%m/%d/%Y %I:%M:%S %p')}\n")
-
-      except Exception as error:
-         print(f"ERROR: {error}", file=sys.stderr)
-         exit(1)
-      dumpOut.write("\n=== Full File ===\n")
-      try:
-         (saveFileInfo, headhex, grids, levels, extraObjectReferenceList) = readFullSaveFile(savFilename, decompressedOutputFilename)
-         dumpOut.write("Successfully parsed save file\n\n")
-
-         dumpOut.write(str(saveFileInfo))
-         dumpOut.write("\nGrids:\n")
-         for grid in grids:
-            dumpOut.write(f"  {grid}\n")
-
-         if PROGRESS_BAR_ENABLE_DUMP:
-            progressBarTotal = 0
-            for level in levels:
-               (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) = level
-               progressBarTotal += len(actorAndComponentObjectHeaders)
-               progressBarTotal += len(objects)
-               if collectables1 != None:
-                  progressBarTotal += len(collectables1)
-               progressBarTotal += len(collectables2)
-            progressBar = ProgressBar(progressBarTotal, "      Dumping: ")
-         dumpOut.write("\nLevels:\n")
-         for level in levels:
-            (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) = level
-            dumpOut.write(f"  Level: {levelName}\n")
-            for actorOrComponentObjectHeader in actorAndComponentObjectHeaders:
-               dumpOut.write(f"    {actorOrComponentObjectHeader}\n")
-               if PROGRESS_BAR_ENABLE_DUMP:
-                  progressBar.add()
-            for object in objects:
-               dumpOut.write(f"    {object}\n")
-               if PROGRESS_BAR_ENABLE_DUMP:
-                  progressBar.add()
-            if collectables1 != None:
-               for collectable in collectables1:
-                  dumpOut.write(f"    Collectable1: {collectable}\n")
-                  if PROGRESS_BAR_ENABLE_DUMP:
-                     progressBar.add()
-            for collectable in collectables2:
-               dumpOut.write(f"    Collectable2: {collectable}\n")
-               if PROGRESS_BAR_ENABLE_DUMP:
-                  progressBar.add()
-         if PROGRESS_BAR_ENABLE_DUMP:
-            progressBar.complete()
-
-         dumpOut.write("\nAdditional object references:\n")
-         for msLevelPathName in extraObjectReferenceList:
-            dumpOut.write(f"  {msLevelPathName}\n")
-
-         with open(somersloopOutputFilename, "w") as somersloopOut:
-            somersloopOut.write("# Exported from Satisfactory \n")
-            somersloopOut.write("SOMERSLOOPS = {\n")
-            for (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) in levels:
-               for actorOrComponentObjectHeader in actorAndComponentObjectHeaders:
-                  if isinstance(actorOrComponentObjectHeader, ActorHeader):
-                     if actorOrComponentObjectHeader.typePath == SOMERSLOOP:
-                        # scale=(1.600000023841858, 1.600000023841858, 1.600000023841858)
-                        somersloopOut.write(f'   "{actorOrComponentObjectHeader.instanceName}": ("{actorOrComponentObjectHeader.rootObject}", {actorOrComponentObjectHeader.rotation}, {actorOrComponentObjectHeader.position}),\n')
-            somersloopOut.write("} # SOMERSLOOPS\n")
-
-         with open(mercerSphereOutputFilename, "w") as mercerSphereOut:
-            mercerSphereOut.write("# Exported from Satisfactory \n")
-            mercerSphereOut.write("MERCER_SPHERES = {\n")
-            for (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) in levels:
-               for actorOrComponentObjectHeader in actorAndComponentObjectHeaders:
-                  if isinstance(actorOrComponentObjectHeader, ActorHeader):
-                     if actorOrComponentObjectHeader.typePath == MERCER_SPHERE:
-                        # scale=(2.700000047683716, 2.6999998092651367, 2.6999998092651367)
-                        mercerSphereOut.write(f'   "{actorOrComponentObjectHeader.instanceName}": ("{actorOrComponentObjectHeader.rootObject}", {actorOrComponentObjectHeader.rotation}, {actorOrComponentObjectHeader.position}),\n')
-            mercerSphereOut.write("} # MERCER_SPHERES\n")
-            mercerSphereOut.write("MERCER_SHRINES = {\n")
-            for (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) in levels:
-               for actorOrComponentObjectHeader in actorAndComponentObjectHeaders:
-                  if isinstance(actorOrComponentObjectHeader, ActorHeader):
-                     if actorOrComponentObjectHeader.typePath == MERCER_SHRINE:
-                        # scale=(1.0, 1.0, 1.0) or (0.8999999761581421, 0.8999999761581421, 0.8999999761581421)
-                        mercerSphereOut.write(f'   "{actorOrComponentObjectHeader.instanceName}": ("{actorOrComponentObjectHeader.rootObject}", {actorOrComponentObjectHeader.rotation}, {actorOrComponentObjectHeader.position}, {actorOrComponentObjectHeader.scale[1]}),\n')
-            mercerSphereOut.write("} # MERCER_SHRINES\n")
-
-         with open(slugOutputFilename, "w") as slugOut:
-
-            numSlug = [0, 0, 0]
-            for slugIdx in range(3):
-               slugOut.write(f"POWER_SLUGS_{('BLUE', 'YELLOW', 'PURPLE')[slugIdx]} = " + "{\n")
-               for (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) in levels:
-                  for actorOrComponentObjectHeader in actorAndComponentObjectHeaders:
-                     if isinstance(actorOrComponentObjectHeader, ActorHeader) and actorOrComponentObjectHeader.typePath == POWER_SLUG[slugIdx]:
-                        slugOut.write(f'   "{actorOrComponentObjectHeader.instanceName}": {actorOrComponentObjectHeader.position},\n')
-                        numSlug[slugIdx] += 1
-               slugOut.write("}\n")
-            slugOut.write(f"# Num slugs: {numSlug}")
-
-            for (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) in levels:
-               if collectables1 != None:
-                  for collectable in collectables1:
-                     if collectable.pathName.startswith("Persistent_Level:PersistentLevel.BP_Crystal"):
-                        slugOut.write(f"COLLECTED: {collectable.pathName}\n")
-
-         with open(droppedItemsOutputFilename, "w") as dropOut:
-            items = {}
-            for (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) in levels:
-               for actorOrComponentObjectHeader in actorAndComponentObjectHeaders:
-                  if isinstance(actorOrComponentObjectHeader, ActorHeader) and actorOrComponentObjectHeader.typePath == "/Script/FactoryGame.FGItemPickup_Spawnable":
-                     items[actorOrComponentObjectHeader.instanceName] = actorOrComponentObjectHeader.position
-            specificItems = {}
-            for (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) in levels:
-               for object in objects:
-                  if object.instanceName in items:
-                     pickupItems = getPropertyValue(object.properties, "mPickupItems")
-                     if pickupItems != None:
-                        pickupItems = pickupItems[0]
-                        item = getPropertyValue(pickupItems, "Item")
-                        if item != None:
-                           item = item[0]
-                           numItems = getPropertyValue(pickupItems, "NumItems")
-                           if numItems != None:
-                              if item not in specificItems:
-                                 specificItems[item] = []
-                              specificItems[item].append([object.instanceName, numItems, items[object.instanceName]])
-            dropOut.write("# Exported from Satisfactory \n")
-            dropOut.write("FREE_DROPPED_ITEMS = {\n")
-            for item in specificItems:
-               dropOut.write(f'   "{item}": [ # {pathNameToReadableName(item)}\n')
-               for (instanceName, quantity, location) in specificItems[item]:
-                  dropOut.write(f'      ({quantity}, {location}, "{instanceName}"),\n')
-               dropOut.write(f'      ],\n')
-            dropOut.write("} # FREE_DROPPED_ITEMS\n")
-
-      except Exception as error:
-         raise Exception(f"ERROR: While processing '{savFilename}': {error}")
-
-   exit(0)
