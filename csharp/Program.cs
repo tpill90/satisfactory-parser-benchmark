@@ -1,29 +1,29 @@
 ﻿global using System.Diagnostics;
 global using SatisfactorySaveNet;
-global using static SaveParserBenchmark.SpectreFormatters;
+global using static Benchmark.SpectreFormatters;
 global using Spectre.Console;
 global using Console = Spectre.Console.AnsiConsole;
 
-namespace SaveParserBenchmark
+namespace Benchmark
 {
-    internal class Program
+    internal sealed class Program
     {
-        //TODO move this to a common location and make it so that it isn't hard coded.
-        private static string saveFilePath = @"C:\Users\Tim\Desktop\SatisfactorySaveParserBenchmark\SampleSave.sav";
-        private static int iterations = 25;
+        private const string SaveFilePath = "SampleSave.sav";
+        private const int Iterations = 25;
 
-        static void Main()
+        private static void Main()
         {
+            Console.MarkupLine(Directory.GetCurrentDirectory());
             Console.MarkupLine(MediumPurple("Starting C# benchmark.."));
             Console.Console.Write(new Rule());
 
             // Loading the save file into memory once, so we don't want to include it in the benchmark
-            var fileAsBytes = File.ReadAllBytes(saveFilePath);
+            var fileAsBytes = File.ReadAllBytes(SaveFilePath);
 
             RunWarmup();
 
             var runResults = new List<Stopwatch>();
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < Iterations; i++)
             {
                 // Force GC between runs, to minimize leftover objects from the previous run.
                 GC.Collect();
@@ -47,7 +47,7 @@ namespace SaveParserBenchmark
         private static void RunWarmup()
         {
             var iterationCount = 10;
-            var fileAsBytes = File.ReadAllBytes(saveFilePath);
+            var fileAsBytes = File.ReadAllBytes(SaveFilePath);
 
             var spectreProgress = Console.Progress().Columns(new List<ProgressColumn>
             {
@@ -71,21 +71,21 @@ namespace SaveParserBenchmark
 
         public static void PrintResultsSummary(List<Stopwatch> runElapsedTimes)
         {
+            // Calculating stats
+            var fastestTime = runElapsedTimes.MinBy(e => e.Elapsed.TotalMilliseconds);
+            var slowestTime = runElapsedTimes.MaxBy(e => e.Elapsed.TotalMilliseconds);
+            var average = runElapsedTimes.Sum(e => e.Elapsed.TotalMilliseconds) / runElapsedTimes.Count;
+
             // White spacing + a horizontal rule to delineate that the command has completed
             Console.WriteLine();
             Console.Write(new Rule());
 
             // Building out summary table
-            var summaryTable = new Table { Border = TableBorder.MinimalHeavyHead };
-            summaryTable.AddColumn(new TableColumn(Cyan("Min")).Centered());
-            summaryTable.AddColumn(new TableColumn(LightYellow("Average")).Centered());
-            summaryTable.AddColumn(new TableColumn(MediumPurple("Max")).Centered());
-
-            var fastestTime = runElapsedTimes.MinBy(e => e.Elapsed.TotalMilliseconds);
-            var slowestTime = runElapsedTimes.MaxBy(e => e.Elapsed.TotalMilliseconds);
-            var average = runElapsedTimes.Sum(e => e.Elapsed.TotalMilliseconds) / runElapsedTimes.Count;
-
-            summaryTable.AddRow($"{fastestTime.ElapsedMilliseconds}ms", $"{(int)average}ms", $"{slowestTime.ElapsedMilliseconds}ms");
+            var summaryTable = new Table { Border = TableBorder.MinimalHeavyHead }
+                               .AddColumn(new TableColumn(Cyan("Min")).Centered())
+                               .AddColumn(new TableColumn(LightYellow("Average")).Centered())
+                               .AddColumn(new TableColumn(MediumPurple("Max")).Centered())
+                               .AddRow($"{fastestTime.ElapsedMilliseconds}ms", $"{(int)average}ms", $"{slowestTime.ElapsedMilliseconds}ms");
 
             // Setting up final formatting, to make sure padding and alignment is correct
             var grid = new Grid()
@@ -99,7 +99,7 @@ namespace SaveParserBenchmark
         }
     }
 
-    public static class SpectreFormatters
+    internal static class SpectreFormatters
     {
         public static string Cyan(object inputObj) => $"[rgb(97,200,214)]{inputObj}[/]";
         public static string Underline(object inputObj) => $"[underline]{inputObj}[/]";

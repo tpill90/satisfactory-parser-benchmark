@@ -5,6 +5,7 @@ TODO write summary
 TODO write c# guide on installing requirements, and running the benchmark
 TODO Run benchmarks against other versions of dotnet.  Try ReadyToRun and AOT as well
 TODO write benchmark results that I got, and include my methodology
+TODO pin the cpu affinity and see if that changes anything
 
 https://github.com/R3dByt3/SatisfactorySaveNet
 https://github.com/GreyHak/sat_sav_parse

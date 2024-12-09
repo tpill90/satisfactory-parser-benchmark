@@ -9,7 +9,8 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <Features>strict</Features>
     <AnalysisLevel>latest</AnalysisLevel>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- dotnet 9 throws all sorts of weird roslyn formatting errors now.  I'm turning this off just for the time being until I figure out why. -->
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <AnalysisMode>AllEnabledByDefault</AnalysisMode>
   </PropertyGroup>
 
