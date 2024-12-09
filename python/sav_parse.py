@@ -25,9 +25,8 @@ import sys
 import zlib
 import glob
 import enum
-
-PROGRESS_BAR_ENABLE_DECOMPRESS = False
-PROGRESS_BAR_ENABLE_PARSE = False
+from rich.progress import ProgressBar
+import zlib
 
 # region Path definitions
 
@@ -2863,7 +2862,7 @@ def getLevelSize(offset, data, persistentLevelFlag = False):
 
    return (offset, actorAndComponentCount * 2)
 
-def parseLevel(offset, data, persistentLevelFlag = False, progressBar = None):
+def parseLevel(offset, data, persistentLevelFlag = False,):
    if persistentLevelFlag:
       levelName = None
    else:
@@ -2886,8 +2885,6 @@ def parseLevel(offset, data, persistentLevelFlag = False, progressBar = None):
          raise ParseError(f"Invalid headerType {headerType}")
       offset = objectHeader.parse(offset, data)
       actorAndComponentObjectHeaders.append(objectHeader)
-      if progressBar != None:
-         progressBar.add()
 
    # Collectables #1
    collectables1 = None
@@ -2912,8 +2909,6 @@ def parseLevel(offset, data, persistentLevelFlag = False, progressBar = None):
       object = Object()
       offset = object.parse(offset, data, actorAndComponentObjectHeaders[idx])
       objects.append(object)
-      if progressBar != None:
-         progressBar.add()
    if offset - objectStartOffset != allObjectsSize:
       raise ParseError(f"Object size mismatch: expect={allObjectsSize} != actual={offset - objectStartOffset}")
 
@@ -3397,71 +3392,34 @@ def readCompressedSaveFile(filename):
    with open(filename, "rb") as fin:
       return fin.read()
 
-class ProgressBar():
-   prior = None
-   current = 0
-   fillChar = "#"
-   emptyChar = "."
-   completedChar = b'\x13\x27'.decode('utf-16')
-   fillColor = "\033[1;37;47m"
-   emptyColor = "\033[0;30;40m"
-   resetColor = "\033[0m"
-   def __init__(self, total, prefix="", width=70):
-      self.total = total
-      self.prefix = prefix
-      self.width = width
-      self.show()
-   def add(self, more=1):
-      self.current += more
-      self.show()
-   def set(self, current=1):
-      self.current = current
-      self.show()
-   def show(self):
-      # Loosely based on imbr's (https://stackoverflow.com/users/1207193/imbr) code at https://stackoverflow.com/questions/3160699/python-progress-bar
-      filled = int(round(self.current / self.total * self.width))
-      if filled != self.prior:
-         if sys.stdout.isatty():
-            print(f"{self.prefix}[{self.fillColor}{self.fillChar*filled}{self.emptyColor}{(self.emptyChar*(self.width-filled))}{self.resetColor}]   {round(self.current)}/{self.total}", end='\r', flush=True)
-         self.prior = filled
-   def complete(self):
-      if sys.stdout.isatty():
-         print(f"{self.prefix}[{self.fillChar*self.width}] {self.completedChar} {self.total}/{self.total}", flush=True)
-
 def decompressSaveFile(offset, data):
-   decompressedData = b""
-   if PROGRESS_BAR_ENABLE_DECOMPRESS:
-      progressBar = ProgressBar(len(data), "Decompression: ")
-   while offset < len(data):
-      offset = confirmBasicType(offset, data, parseUint32, 0x9e2a83c1)  # unrealEnginePackageSignature
-      offset = confirmBasicType(offset, data, parseUint32, 0x22222222)
-      offset = confirmBasicType(offset, data, parseUint8, 0)
+    decompressedData = b""
 
-      (offset, maximumChunkSize) = parseUint32(offset, data)
-      offset = confirmBasicType(offset, data, parseUint32, 0x03000000)
-      (offset, currentChunkCompressedLength1) = parseUint64(offset, data)
-      (offset, currentChunkUncompressedLength1) = parseUint64(offset, data)
-      (offset, currentChunkCompressedLength2) = parseUint64(offset, data)
-      (offset, currentChunkUncompressedLength2) = parseUint64(offset, data)
+    while offset < len(data):
+        offset = confirmBasicType(offset, data, parseUint32, 0x9e2a83c1)  # unrealEnginePackageSignature
+        offset = confirmBasicType(offset, data, parseUint32, 0x22222222)
+        offset = confirmBasicType(offset, data, parseUint8, 0)
 
-      if currentChunkCompressedLength1 != currentChunkCompressedLength2:
-         raise ParseError(f"Compressed size mismatch {currentChunkCompressedLength1} != {currentChunkCompressedLength2}")
-      if currentChunkUncompressedLength1 != currentChunkUncompressedLength2:
-         raise ParseError(f"Uncompressed size mismatch {currentChunkUncompressedLength1} != {currentChunkUncompressedLength2}")
-      if offset+currentChunkCompressedLength1 > len(data):
-         raise ParseError(f"Chunk compressed length exceeds end of file by {offset+currentChunkCompressedLength1 - len(data)}")
+        (offset, maximumChunkSize) = parseUint32(offset, data)
+        offset = confirmBasicType(offset, data, parseUint32, 0x03000000)
+        (offset, currentChunkCompressedLength1) = parseUint64(offset, data)
+        (offset, currentChunkUncompressedLength1) = parseUint64(offset, data)
+        (offset, currentChunkCompressedLength2) = parseUint64(offset, data)
+        (offset, currentChunkUncompressedLength2) = parseUint64(offset, data)
 
-      dData = zlib.decompress(data[offset:offset+currentChunkCompressedLength1])
-      if len(dData) != currentChunkUncompressedLength1:
-         raise ParseError(f"Decompression didn't return the expected amount return={len(dData)} != expected={currentChunkUncompressedLength1}")
-      decompressedData += dData
-      offset += currentChunkCompressedLength1
-      if PROGRESS_BAR_ENABLE_DECOMPRESS:
-         progressBar.set(offset)
+        if currentChunkCompressedLength1 != currentChunkCompressedLength2:
+            raise ParseError(f"Compressed size mismatch {currentChunkCompressedLength1} != {currentChunkCompressedLength2}")
+        if currentChunkUncompressedLength1 != currentChunkUncompressedLength2:
+            raise ParseError(f"Uncompressed size mismatch {currentChunkUncompressedLength1} != {currentChunkUncompressedLength2}")
+        if offset+currentChunkCompressedLength1 > len(data):
+            raise ParseError(f"Chunk compressed length exceeds end of file by {offset+currentChunkCompressedLength1 - len(data)}")
 
-   if PROGRESS_BAR_ENABLE_DECOMPRESS:
-      progressBar.complete()
-   return decompressedData
+        dData = zlib.decompress(data[offset:offset+currentChunkCompressedLength1])
+        if len(dData) != currentChunkUncompressedLength1:
+            raise ParseError(f"Decompression didn't return the expected amount return={len(dData)} != expected={currentChunkUncompressedLength1}")
+        decompressedData += dData
+        offset += currentChunkCompressedLength1
+    return decompressedData
 
 def readFullSaveFile(filename, decompressedOutputFilename = None):
    global satisfactoryCalculatorInteractiveMapExtras
@@ -3510,25 +3468,10 @@ def readFullSaveFile(filename, decompressedOutputFilename = None):
    levels = []
    (offset, levelCount) = parseUint32(offset, data)
 
-   if PROGRESS_BAR_ENABLE_PARSE:
-      totalLevelSize = 0
-      levelSizes = []
-      tmpOffset = offset
-      for idx in range(levelCount):
-         (tmpOffset, levelSize) = getLevelSize(tmpOffset, data)
-         totalLevelSize += levelSize
-         levelSizes.append(levelSize)
-      (tmpOffset, levelSize) = getLevelSize(tmpOffset, data, True)
-      totalLevelSize += levelSize
-      levelSizes.append(levelSize)
-      progressBar = ProgressBar(totalLevelSize, "      Parsing: ")
-   else:
-      progressBar = None
-
    for idx in range(levelCount):
-      (offset, level) = parseLevel(offset, data, False, progressBar)
+      (offset, level) = parseLevel(offset, data, False)
       levels.append(level)
-   (offset, level) = parseLevel(offset, data, True, progressBar) # Potentially sets the global satisfactoryCalculatorInteractiveMapExtras
+   (offset, level) = parseLevel(offset, data, True) # Potentially sets the global satisfactoryCalculatorInteractiveMapExtras
    levels.append(level)
 
    offset = confirmBasicType(offset, data, parseUint32, 0)
@@ -3545,8 +3488,6 @@ def readFullSaveFile(filename, decompressedOutputFilename = None):
 
    if offset != len(data):
       raise ParseError(f"Parsed data {offset} does not match decompressed data {len(data)}.")
-   if PROGRESS_BAR_ENABLE_PARSE:
-      progressBar.complete()
 
    if len(satisfactoryCalculatorInteractiveMapExtras) > 0:
       print(f"File suspected of having been saved by satisfactory-calculator.com/en/interactive-map for {len(satisfactoryCalculatorInteractiveMapExtras)} reasons.", file=sys.stderr)
