@@ -1,4 +1,10 @@
-﻿namespace SaveParserBenchmark
+﻿global using System.Diagnostics;
+global using SatisfactorySaveNet;
+global using static SaveParserBenchmark.SpectreFormatters;
+global using Spectre.Console;
+global using Console = Spectre.Console.AnsiConsole;
+
+namespace SaveParserBenchmark
 {
     internal class Program
     {
