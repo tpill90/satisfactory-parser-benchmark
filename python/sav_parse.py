@@ -28,8 +28,6 @@ import enum
 
 PROGRESS_BAR_ENABLE_DECOMPRESS = False
 PROGRESS_BAR_ENABLE_PARSE = False
-PROGRESS_BAR_ENABLE_DUMP = True
-PRINT_DEBUG = False
 
 # region Path definitions
 
@@ -3552,19 +3550,6 @@ def readFullSaveFile(filename, decompressedOutputFilename = None):
 
    if len(satisfactoryCalculatorInteractiveMapExtras) > 0:
       print(f"File suspected of having been saved by satisfactory-calculator.com/en/interactive-map for {len(satisfactoryCalculatorInteractiveMapExtras)} reasons.", file=sys.stderr)
-
-   if PRINT_DEBUG:
-      countOfNoneCollectables1 = 0
-      emptyCollectables1 = 0
-      for (levelName, actorAndComponentObjectHeaders, collectables1, objects, collectables2) in levels:
-         if collectables1 == None:
-            countOfNoneCollectables1 += 1
-         elif len(collectables1) == 0:
-            emptyCollectables1 += 1
-      if countOfNoneCollectables1 > 0:
-         print(f"Skipped {countOfNoneCollectables1} level collectables1 with {emptyCollectables1} empty collectables1")
-      if extraObjectReferenceCount > 0:
-         print(f"extraObjectReferenceCount={extraObjectReferenceCount}")
 
    return (saveFileInfo, (headhex1, headhex2), grids, levels, extraObjectReferenceList)
 

@@ -4,3 +4,4 @@ obj
 .vs
 *.ak
 lockfile
+/python/__pycache__/*.pyc
