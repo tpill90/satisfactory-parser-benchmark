@@ -5,12 +5,11 @@ import time
 from typing import List
 import statistics
 from rich import box
-from rich.console import Console, Group
+from rich.console import Console
 from rich.table import Table
 from rich.rule import Rule
 from rich.text import Text
 from rich.align import Align
-from rich.panel import Panel
 
 iterations = 10
 console = Console()
@@ -41,7 +40,7 @@ for i in range(iterations):
 
 	# Run the save parser
 	start_time = time.perf_counter()
-	sav_parse.readFullSaveFile("../SampleSave-Small.sav")
+	sav_parse.readFullSaveFile("../SampleSave.sav")
 
 	# Save and log the results
 	end_time = time.perf_counter()

@@ -28,11 +28,15 @@ choco install dotnet-sdk python git.install
 ```
 
 Once the prerequisites are installed, or if they have already been installed by other means, you can clone the repo to get a copy of the code.
-fsdf
 
 <!-- TODO Fill out this command when uploaded to github-->
 ```powershell
 TODO put clone command in here once uploaded to github
+```
+
+To run the C# benchmark you can run the following commands from the repository root:
+```powershell
+
 ```
 
 ---
