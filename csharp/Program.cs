@@ -8,8 +8,8 @@ namespace Benchmark
 {
     internal sealed class Program
     {
-        private const string SaveFilePath = "SampleSave.sav";
-        private const int Iterations = 25;
+        private const string SaveFilePath = "../SampleSave.sav";
+        private const int Iterations = 10;
 
         private static void Main()
         {
